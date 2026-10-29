@@ -22,6 +22,8 @@ public final class WorkLogTest {
         csv();
         jobs();
         reviewFixes();
+        shortNames();
+        mergeAndSplit();
         System.out.println("PASS: " + assertions + " work log assertions");
     }
 
@@ -325,6 +327,53 @@ public final class WorkLogTest {
     private static long at(String time) { return Instant.parse("2026-10-28T" + time + ":00Z").getEpochSecond(); }
     private static long hours(long h) { return h * 3600; }
     private static long minutes(long m) { return m * 60; }
+    private static void shortNames() {
+        check(WorkLog.shortName("United Postal Service").equals("UPS"), "Initials of each word");
+        check(WorkLog.shortName("Main job").equals("MJ"), "Two words, two letters");
+        check(WorkLog.shortName("Cafe, evenings").equals("CE"), "Punctuation separates words");
+        check(WorkLog.shortName("Cafe").equals("CAFE") && WorkLog.shortName("Warehouse").equals("WAR"),
+                "One short word is kept whole; a long one gives three letters");
+        check(WorkLog.shortName("Bank of the West Coast").equals("BOTW"), "At most four letters");
+        check(WorkLog.shortName("Store 42").equals("S4") && WorkLog.shortName("--").equals("?"), "Digits count; no letters gives ?");
+    }
+
+    private static void mergeAndSplit() {
+        WorkLog log = sample();
+        WorkLog.Period work = log.work(DAY).get(0);
+        WorkLog.Period lunch = log.children(DAY, work).get(1);
+        // Cutting work at 12:30 also cuts lunch, and each part keeps what lies inside it.
+        WorkLog.Period afternoon = log.split(DAY, work, at("12:30"), 0);
+        check(work.end == at("12:30") && afternoon.start == at("12:30") && afternoon.end == at("17:00"), "Cut work in two");
+        check(lunch.end == at("12:30") && log.children(DAY, work).size() == 2, "Morning keeps productive and half of lunch");
+        List<WorkLog.Period> later = log.children(DAY, afternoon);
+        check(later.size() == 1 && later.get(0).kind == WorkLog.Kind.BREAK && later.get(0).start == at("12:30")
+                && later.get(0).end == at("13:00"), "Afternoon gets the rest of lunch");
+        check(log.dirty.contains(DAY) && log.totals(DAY, 0).worked() == 7 * 3600, "Cutting changes no totals");
+        // Touching handles merge the parts back, lunch included once its work is whole again.
+        check(log.touching(DAY, work, false) == afternoon && log.touching(DAY, afternoon, true) == work, "Work parts touch");
+        check(log.touching(DAY, lunch, false) == null, "Lunch halves in different work do not merge");
+        log.merge(DAY, afternoon, work);
+        check(log.work(DAY).size() == 1 && work.end == at("17:00"), "Merged back into one work period");
+        WorkLog.Period rest = log.touching(DAY, lunch, false);
+        check(rest != null && log.merge(DAY, lunch, rest) == lunch && lunch.end == at("13:00")
+                && log.children(DAY, work).size() == 2, "Lunch halves merge once in one work period");
+        check(log.touching(DAY, log.children(DAY, work).get(0), false) == null, "Productive does not merge with lunch");
+        // Bad cuts and merges are refused.
+        try { log.split(DAY, work, at("09:00") + 30, 0); throw new AssertionError("Cut at the very start"); }
+        catch (IllegalArgumentException expected) { assertions++; }
+        WorkLog.Period evening = log.addWork(DAY, 0, UTC, J);
+        evening.start = at("18:00"); evening.end = at("19:00");
+        try { log.merge(DAY, work, evening); throw new AssertionError("Merged across a gap"); }
+        catch (IllegalArgumentException expected) { assertions++; }
+        // A running period cut in two keeps running in its later part.
+        WorkLog running = new WorkLog();
+        running.punchIn(J, at("09:00"), UTC);
+        WorkLog.Period open = running.work(DAY).get(0);
+        WorkLog.Period now = running.split(DAY, open, at("10:00"), at("11:00"));
+        check(open.end == at("10:00") && now.open() && running.working(J) && running.openWork(J).getValue() == now,
+                "The later part keeps running");
+    }
+
     private static void check(boolean condition, String message) {
         assertions++; if (!condition) throw new AssertionError(message);
     }

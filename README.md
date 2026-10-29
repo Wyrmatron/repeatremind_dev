@@ -52,20 +52,28 @@ The app has three rooms, switched with the icon bar at the bottom: **Reminders**
   dimmed) while the other runs for that job. Punching out of a job also ends that job's productive or break
   time, which cannot outlast it. Today's worked, productive, unproductive and break time is shown below. Work is saved only when you tap a toggle or edit a day;
   nothing is written on a timer. A shift past midnight stays on the day it started.
-- **Jobs:** the row above the toggles holds your jobs, each showing whether it is off, punched in,
-  productive or on break. Tap a job to point the toggles at it; nothing is punched in or out for you.
+- **Work room bar:** just above the room icons, the work room has its own bar: **Tracker**, **Details**,
+  **Schedule** and the current job. Tap the job to roll out your jobs, each showing whether it is off,
+  punched in, productive or on break, and pick one to point the toggles at it; nothing is punched in or out for you.
   Several jobs can be punched in, and productive, at the same time, each with its own timeline. Day totals
-  add each job's own time. **Jobs…** adds or renames jobs. A job with no recorded work is deleted; one with
+  add each job's own time. **Manage jobs…** (in the same list) adds or renames jobs. A job with no recorded work is deleted; one with
   work is archived, so its history and exports keep its name, and can be restored. Choosing a job writes
   nothing.
 - **Work tracker → Details** is a calendar: each worked day has a circle that grows with the hours
-  worked. Tap a day for its candle graph: work periods in the first column; productive, unproductive
-  and break time in the second. Drag the round handles at the start and end of a period to move it in
-  5-minute steps, or tap a handle to set the exact minute with the system time picker. Within a job,
-  periods never overlap and productive and break time stay inside their work period; jobs that overlap in
-  time get side-by-side lanes in each column. The list below the graph does
-  the same with buttons, and can add or delete periods. Worked time excludes breaks; unproductive time is
-  worked time that was not productive.
+  worked. Tap a day for its candle graph, which fills the screen and scrolls: work in the first column,
+  productive over unproductive time in the second, and breaks in the third. Each candle shows its start, the
+  job's short name (its initials, e.g. United Postal Service → UPS) and its end.
+  - Drag the round handles at a candle's start and end to move it in 5-minute steps, or tap a handle to set
+    the exact minute with the system time picker.
+  - Hold a handle on the touching handle of the next or previous candle of the same kind to merge the two.
+  - Swipe sideways across a candle to cut it in two there; cutting work also cuts the time inside it.
+  - Tap a candle for its details: job, start and end with dates, length and, for work, the time inside it,
+    with buttons to change the times or job, or delete it.
+  - **+ Work**, **+ Productive** and **+ Break** add periods.
+
+  Within a job, periods never overlap and productive and break time stay inside their work period; jobs
+  that overlap in time get side-by-side lanes in each column. Worked time excludes breaks; unproductive time
+  is worked time that was not productive.
 - **Export CSV** (in Details) saves a CSV wherever you choose, using Android's own file picker (no storage
   permission). Choose the dates (the month shown, all recorded days, or a range), one job or all, and a format:
   - **Daily summary:** one row per day and job: date, weekday, job, first in, last out, punched, break,
@@ -147,7 +155,7 @@ and readable label contrast over a grid of sRGB colours. `ScheduleTest` checks s
 validation, list labels, and the date-level recurrence helpers. `WorkdaysTest` checks shift and
 break validation, overnight shifts, reminder lead times across midnight and DST, per-day shifts,
 one delivery per shift, and workday labels. `WorkLogTest` checks the punch clock toggles, totals,
-editing limits and 5-minute snapping, adding and deleting periods, night shifts, jobs (switching, totals
+editing limits and 5-minute snapping, adding, deleting, merging and cutting periods, short job names, night shifts, jobs (switching, totals
 by job, archiving, storage), and both CSV formats including quoting. `ReminderStateTest` also covers temporary tasks,
 wake-up selection, late completion, clock changes and compact history storage.
 The framework-only `SmokeInstrumentation` additionally exercises editor persistence, list

@@ -246,13 +246,13 @@ public final class SmokeInstrumentation extends Instrumentation {
             Activity tracker = startActivitySync(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             waitForIdleSync();
             ui(() -> findText(tracker, "Work tracker").performClick()); waitForIdleSync();
-            await(() -> findText(tracker, "Punch in") != null && findTextStarting(tracker, "Main job · Off") != null,
-                    "Work tracker room shows the punch clock and the job dropdown");
+            await(() -> findText(tracker, "Punch in") != null && findText(tracker, "Main job \u25BE") != null
+                    && findText(tracker, "Tracker").isSelected(), "Work tracker room shows the punch clock and its bar with the job");
             check(!findText(tracker, "Start productive").isEnabled() && !findText(tracker, "Start lunch/break").isEnabled(),
                     "Productive and break wait for punch in");
             ui(() -> findText(tracker, "Punch in").performClick()); waitForIdleSync();
-            await(() -> findText(tracker, "Punch out") != null && findText(tracker, "Start productive").isEnabled()
-                    && findTextStarting(tracker, "Main job · Punched in") != null, "Punch in enables productive time");
+            await(() -> findText(tracker, "Punch out") != null && findText(tracker, "Start productive").isEnabled(),
+                    "Punch in enables productive time");
             ui(() -> findText(tracker, "Start productive").performClick()); waitForIdleSync();
             await(() -> findText(tracker, "Stop productive") != null, "Productive time starts");
             check(findText(tracker, "Stop productive").isSelected() && findText(tracker, "Punch out").isSelected(),
@@ -282,7 +282,9 @@ public final class SmokeInstrumentation extends Instrumentation {
             ui(() -> findText(tracker, String.valueOf(LocalDate.now().getDayOfMonth())).performClick());
             Activity dayView = waitForMonitorWithTimeout(dayMonitor, 15000); removeMonitor(dayMonitor);
             check(dayView != null, "A calendar day opens the day view"); waitForIdleSync();
-            await(() -> findText(dayView, "Add work period") != null, "Day view renders its candle graph and controls");
+            await(() -> findText(dayView, "+ Work") != null && findText(dayView, "+ Break") != null,
+                    "Day view renders its candle graph and one row of add buttons");
+            await(dayView::hasWindowFocus, "Day view is in front");
             screenshot("smoke-day.png"); ui(dayView::finish); waitForIdleSync();
             ui(() -> findText(tracker, "Schedule").performClick()); waitForIdleSync();
             await(() -> findText(tracker, "Set up schedule") != null || findText(tracker, "Edit schedule") != null,

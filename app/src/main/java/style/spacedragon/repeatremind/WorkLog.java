@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -127,6 +128,24 @@ final class WorkLog {
         if (trimmed.isEmpty()) throw new IllegalArgumentException("Enter a job name");
         if (trimmed.length() > 60) throw new IllegalArgumentException("Use 60 characters or fewer");
         return trimmed;
+    }
+
+    /**
+     * A few capitals for a job's name: the first letter of each word ("United Postal Service" is UPS), up to four;
+     * a single word of four letters or fewer is kept whole, a longer one gives its first three.
+     */
+    static String shortName(String name) {
+        List<String> words = new ArrayList<>();
+        for (String word : name.split("[^\\p{L}\\p{N}]+")) if (!word.isEmpty()) words.add(word);
+        if (words.isEmpty()) return "?";
+        if (words.size() == 1) {
+            String word = words.get(0);
+            int letters = word.codePointCount(0, word.length());
+            return (letters <= 4 ? word : word.substring(0, word.offsetByCodePoints(0, 3))).toUpperCase(Locale.ROOT);
+        }
+        StringBuilder initials = new StringBuilder();
+        for (int i = 0; i < words.size() && i < 4; i++) initials.appendCodePoint(words.get(i).codePointAt(0));
+        return initials.toString().toUpperCase(Locale.ROOT);
     }
 
     /** One job per line: id, archived flag (0 or 1) and name, separated by '|'. */
@@ -373,6 +392,60 @@ final class WorkLog {
         if (periods.isEmpty()) days.remove(day);
         dirty.add(day);
         openWork = null;
+    }
+
+    /**
+     * The period of the same kind and job whose edge meets this one's start or end, so the two can merge;
+     * productive and break time must also share their work period. Null if none meets it.
+     */
+    Period touching(LocalDate day, Period period, boolean start) {
+        if (!start && period.open()) return null;
+        long edge = start ? period.start : period.end;
+        Period parent = period.kind == Kind.WORK ? null : parent(day, period);
+        for (Period other : periods(day)) {
+            if (other == period || other.kind != period.kind || other.job != period.job) continue;
+            boolean meets = start ? !other.open() && other.end == edge : other.start == edge;
+            if (meets && (period.kind == Kind.WORK || parent(day, other) == parent)) return other;
+        }
+        return null;
+    }
+
+    /** Joins two touching periods into the earlier one; merged work holds what both held. */
+    Period merge(LocalDate day, Period a, Period b) {
+        Period first = a.start <= b.start ? a : b, second = first == a ? b : a;
+        List<Period> periods = days.get(day);
+        if (periods == null || !periods.contains(first) || !periods.contains(second) || first.kind != second.kind
+                || first.job != second.job || first.open() || first.end != second.start
+                || (first.kind != Kind.WORK && parent(day, first) != parent(day, second))) {
+            throw new IllegalArgumentException("Only touching periods of the same kind can merge");
+        }
+        first.end = second.end;
+        periods.remove(second);
+        dirty.add(day);
+        openWork = null;
+        return first;
+    }
+
+    /**
+     * Cuts a period in two at a time inside it and returns the later part. Cutting work also cuts the productive
+     * or break time it crosses, so each part keeps what lies inside it.
+     */
+    Period split(LocalDate day, Period period, long at, long now) {
+        if (at - period.start < MIN_LENGTH || period.end(now) - at < MIN_LENGTH) {
+            throw new IllegalArgumentException("Cut at least a minute from either end");
+        }
+        List<Period> pieces = new ArrayList<>(Collections.singletonList(period));
+        if (period.kind == Kind.WORK) {
+            for (Period child : children(day, period)) if (child.start < at && at < child.end(now)) pieces.add(child);
+        }
+        Period later = null;
+        for (Period piece : pieces) {
+            Period rest = new Period(piece.kind, at, piece.end, piece.job);
+            piece.end = at;
+            add(day, rest);
+            if (piece == period) later = rest;
+        }
+        return later;
     }
 
     /** Moves a work period, with what it contains, to another job; refused if it would overlap that job's work. */

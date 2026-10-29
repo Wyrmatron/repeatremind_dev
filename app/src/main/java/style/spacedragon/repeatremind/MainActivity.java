@@ -142,7 +142,6 @@ public final class MainActivity extends BaseActivity {
         dayTime = DateTimeFormatter.ofPattern("EEE, MMM d · " + timePattern());
         LinearLayout root = column();
         root.addView(header(ROOMS[room], button("Theme", this::chooseTheme)));
-        if (room == WORK) root.addView(tabs(WorkRoom.NAMES, workRoom, tab -> { workRoom = tab; render(); }));
         boolean reminders = room == REMINDERS ? tasks.stream().anyMatch(Task::remindersActive)
                 : room == WORK && workRoom == WorkRoom.SCHEDULE && schedule != null && schedule.reminder;
         boolean notifications = !Reminders.allowed(this);
@@ -181,6 +180,7 @@ public final class MainActivity extends BaseActivity {
         floating.setMargins(dp(24), dp(24), dp(24), dp(24));
         body.addView(add, floating);
         }
+        if (room == WORK) root.addView(workBar());
         root.addView(rooms());
         install(root);
         // Refresh calendar state only while visible, including tasks with no notification.
@@ -302,14 +302,28 @@ public final class MainActivity extends BaseActivity {
         list.setOnItemClickListener((parent, view, position, id) -> edit(missed.get(position).task.id));
     }
 
+    /** The work room's sub-rooms and current job, just above the room bar. */
+    private LinearLayout workBar() {
+        LinearLayout bar = tabs(WorkRoom.NAMES, workRoom, tab -> { workRoom = tab; render(); });
+        bar.setPadding(dp(12), dp(6), dp(12), 0);
+        bar.setBackgroundColor(palette.surface);
+        Button job = work.jobButton();
+        if (job != null) {
+            LinearLayout.LayoutParams cell = new LinearLayout.LayoutParams(0, -2, 1.3f);
+            cell.setMarginStart(dp(8));
+            bar.addView(job, cell);
+        }
+        return bar;
+    }
+
     /** Equal-width tab buttons; the selected one uses the highlight colour. */
     private LinearLayout tabs(String[] labels, int selected, IntConsumer pick) {
         LinearLayout tabs = new LinearLayout(this);
-        tabs.setPadding(dp(20), 0, dp(20), dp(8));
         for (int i = 0; i < labels.length; i++) {
             final int tab = i;
             Button tabButton = button(labels[i], () -> pick.accept(tab));
             tabButton.setPadding(dp(6), dp(8), dp(6), dp(8));
+            tabButton.setSingleLine(true);
             boolean on = selected == i;
             tabButton.setSelected(on);
             tabButton.setBackground(background(on ? palette.highlight : palette.surface, 12, true));

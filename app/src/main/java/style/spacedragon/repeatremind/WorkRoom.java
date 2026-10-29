@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.widget.Button;
 import android.widget.EditText;
@@ -68,14 +69,17 @@ final class WorkRoom {
         content.setPadding(a.dp(20), a.dp(8), a.dp(20), a.dp(24));
         scroll.addView(content);
         body.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
-        if (sub != SCHEDULE && (log == null || stale)) {
+        // The schedule needs no log, but the bar's job button does.
+        if (log == null || stale) {
             try {
                 log = new WorkLogStore(a).load();
                 stale = false;
             } catch (IllegalStateException e) {
                 log = null;
-                content.addView(a.text("Work hours could not be read: " + e.getMessage(), 15, a.palette.text));
-                return;
+                if (sub != SCHEDULE) {
+                    content.addView(a.text("Work hours could not be read: " + e.getMessage(), 15, a.palette.text));
+                    return;
+                }
             }
         }
         if (log != null && chosenJob != 0 && log.activeJobs().contains(chosenJob)) log.selected = chosenJob;
@@ -89,7 +93,6 @@ final class WorkRoom {
     // ---- Tracker ----
 
     private void tracker(LinearLayout content) {
-        content.addView(jobBar(), a.spaced());
         int job = log.selected;
         // Each toggle acts on the selected job only; one that cannot apply yet is shown disabled, never changed for you.
         content.addView(toggle(log.working(job), true, "Punch out", "Punch in", () -> {
@@ -154,13 +157,17 @@ final class WorkRoom {
                 : log.running(WorkLog.Kind.BREAK, job) ? "On break" : "Punched in";
     }
 
-    /** One row: a dropdown of the jobs, each with its state, and the job manager. Picking only chooses which job the toggles act on. */
-    private LinearLayout jobBar() {
-        LinearLayout row = new LinearLayout(a);
-        row.setGravity(Gravity.CENTER_VERTICAL);
+    /**
+     * The current job, for the work room's bar. Tapping it rolls out the jobs, each with its state, and the job
+     * manager; picking a job only chooses which one the toggles act on. Null while the log cannot be read.
+     */
+    Button jobButton() {
+        if (log == null) return null;
         int selected = log.selected;
-        Button drop = a.button(log.jobName(selected) + " · " + state(selected) + "  \u25BE", null);
-        drop.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        Button drop = a.button(log.jobName(selected) + " \u25BE", null);
+        drop.setSingleLine(true);
+        drop.setEllipsize(TextUtils.TruncateAt.END);
+        drop.setPadding(a.dp(6), a.dp(8), a.dp(6), a.dp(8));
         drop.setBackground(a.background(a.palette.surface, 12, true));
         drop.setTextColor(a.palette.text);
         drop.setTypeface(null, Typeface.BOLD);
@@ -171,15 +178,14 @@ final class WorkRoom {
                 menu.getMenu().add(0, job, 0, log.jobName(job) + " · " + state(job)).setCheckable(true).setChecked(job == selected);
             }
             menu.getMenu().setGroupCheckable(0, true, true);
-            menu.setOnMenuItemClickListener(item -> { pickJob(item.getItemId()); return true; });
+            menu.getMenu().add(1, WorkLog.ALL_JOBS, 1, "Manage jobs…");
+            menu.setOnMenuItemClickListener(item -> {
+                if (item.getGroupId() == 1) manageJobs(); else pickJob(item.getItemId());
+                return true;
+            });
             menu.show();
         });
-        row.addView(drop, new LinearLayout.LayoutParams(0, -2, 1));
-        Button manage = a.button("Jobs…", this::manageJobs);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -2);
-        params.setMarginStart(a.dp(8));
-        row.addView(manage, params);
-        return row;
+        return drop;
     }
 
     /** Chooses the job the toggles act on; nothing is punched in or out, and nothing is written. */
